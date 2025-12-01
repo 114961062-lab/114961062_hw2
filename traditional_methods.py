@@ -54,6 +54,7 @@ def similarity_sklearn(texts):
     sim = cosine_similarity(X, X)
     return sim
 
+
 def load_texts_from_csv(path, text_column="text"):
     """
     從 CSV 檔讀取文字欄位
@@ -77,6 +78,26 @@ def load_texts_from_csv(path, text_column="text"):
     texts = df[text_column].astype(str).tolist()
     return texts
 
+def rule_based_label(text: str) -> str:
+    """
+    A-2 規則式分類器
+    這裡先用範例類別，你要依照作業說明，把類別名稱與關鍵字改掉
+    """
+    t = text.lower()
+
+    # ======= 類別 1：AI / 機器學習相關 =======
+    ai_keywords = ["人工智慧", "機器學習", "深度學習", "ai"]
+    if any(k in t for k in ai_keywords):
+        return "AI/ML"
+
+    # ======= 類別 2：運動 / 健康 =======
+    sport_keywords = ["運動", "健康", "跑步", "健身"]
+    if any(k in t for k in sport_keywords):
+        return "Sport/Health"
+
+    # ======= 其他：無法歸類到上述 =======
+    return "Other"
+
 def run_tfidf_task():
     csv_path = "data/texts.csv"
     text_column = "text"
@@ -91,6 +112,30 @@ def run_tfidf_task():
     pd.DataFrame(sim_sklearn).to_csv("results/tfidf_similarity_sklearn.csv", index=False)
 
     print("A-1 完成，已輸出到 results/")
+
+def run_rule_based_A2():
+    """
+    A-2：規則式分類
+    讀取 data/texts.csv，對每筆文本產生一個類別標籤，
+    並輸出到 results/rule_based_A2.csv
+    """
+    csv_path = "data/texts.csv"
+    # 你現在 CSV 第一欄叫 'A-1'，如果之後改成 'text' 要記得一起改
+    text_column = "text"
+
+    texts = load_texts_from_csv(csv_path, text_column)
+    print(f"A-2 載入 {len(texts)} 筆文本資料")
+
+    labels = [rule_based_label(t) for t in texts]
+
+    df_out = pd.DataFrame({
+        "text": texts,
+        "label": labels,
+    })
+
+    output_path = "results/rule_based_A2.csv"
+    df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
+    print(f"A-2 完成，已輸出到 {output_path}")
 
 def rule_based_label(text):
     """
@@ -134,5 +179,8 @@ def run_rule_based_classification():
 
 
 if __name__ == "__main__":
+    # A-1：TF-IDF 相似度
     run_tfidf_task()
-    run_rule_based_classification()  # A-2 規則式分類
+
+    # A-2：規則式分類
+    run_rule_based_A2()
