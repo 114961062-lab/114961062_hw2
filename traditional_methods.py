@@ -2,6 +2,7 @@ import math
 import jieba
 import numpy as np
 import pandas as pd
+import re 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -9,6 +10,49 @@ from sklearn.metrics.pairwise import cosine_similarity
 def tokenize(text):
     return [w for w in jieba.lcut(text) if w.strip()]
 
+def split_sentences(text: str):
+    """
+    將一段中文文字依「。！？!?」切成句子
+    回傳句子 list，已去掉空白
+    """
+    if not isinstance(text, str):
+        text = str(text)
+    # 用中文與英文的句號、問號、驚嘆號斷句
+    parts = re.split(r'(?<=[。！？!?])', text)
+    sentences = [p.strip() for p in parts if p.strip()]
+    return sentences
+
+def summarize_text(text: str, max_sentences: int = 2) -> str:
+    """
+    對單一篇文章做抽取式摘要：
+    - 將文章切成句子
+    - 以 TF-IDF 計算每句分數
+    - 取分數最高的 max_sentences 句，依原順序組合
+    """
+    sentences = split_sentences(text)
+
+    # 如果句子數很少，就直接回傳原文
+    if len(sentences) <= max_sentences:
+        return text.strip()
+
+    # 使用前面已經 import 的 TfidfVectorizer 與 tokenize
+    vectorizer = TfidfVectorizer(
+        tokenizer=lambda x: tokenize(x),
+        lowercase=False
+    )
+    X = vectorizer.fit_transform(sentences)  # shape: (num_sentences, vocab_size)
+
+    # 每句分數 = 該行 TF-IDF 權重總和
+    scores = X.sum(axis=1).A1  # 轉成 1D numpy array
+
+    # 取分數最高的 max_sentences 句
+    top_idx = np.argsort(-scores)[:max_sentences]
+    # 為了摘要閱讀順序自然，依原來句子順序排序
+    top_idx_sorted = sorted(top_idx)
+
+    summary_sentences = [sentences[i] for i in top_idx_sorted]
+    summary = "".join(summary_sentences)
+    return summary
 
 def calculate_tf(word_dict, total_words):
     return {w: count / total_words for w, count in word_dict.items()}
@@ -137,6 +181,30 @@ def run_rule_based_A2():
     df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
     print(f"A-2 完成，已輸出到 {output_path}")
 
+def run_summary_A3():
+    """
+    A-3：傳統方法的抽取式摘要
+    讀取 data/texts.csv，對每筆文本產生摘要，
+    輸出到 results/summary_A3.csv
+    """
+    csv_path = "data/texts.csv"
+    # 目前你的 CSV 第一欄欄位名稱是 'A-1'，若之後改成 'text' 要同步修改
+    text_column = "A-1"
+
+    texts = load_texts_from_csv(csv_path, text_column)
+    print(f"A-3 載入 {len(texts)} 筆文本資料")
+
+    # 每篇文章取 2 句作摘要；若作業有指定句數，請改 max_sentences
+    summaries = [summarize_text(t, max_sentences=2) for t in texts]
+
+    df_out = pd.DataFrame({
+        "text": texts,
+        "summary": summaries,
+    })
+    output_path = "results/summary_A3.csv"
+    df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
+    print(f"A-3 完成，已輸出到 {output_path}")
+
 def rule_based_label(text):
     """
     非機器學習的規則式分類器：
@@ -184,3 +252,6 @@ if __name__ == "__main__":
 
     # A-2：規則式分類
     run_rule_based_A2()
+
+    # A-3：抽取式摘要
+    run_summary_A3()
