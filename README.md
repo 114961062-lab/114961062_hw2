@@ -33,8 +33,6 @@
 │
 └── README.md # 本檔案
 
-markdown
-複製程式碼
 
 ---
 
