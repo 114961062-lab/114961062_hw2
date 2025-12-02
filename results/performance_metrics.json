@@ -1,19 +1,19 @@
 {
   "similarity_traditional": {
-    "time_sec": 0.001957799999672716,
+    "time_sec": 0.0022144000004118425,
     "avg_similarity": 0.16666666666666666
   },
   "similarity_ai": {
-    "time_sec": 5.458331400000134,
-    "avg_similarity": 0.19
+    "time_sec": 5.91125220000049,
+    "avg_similarity": 0.2
   },
   "classification_traditional": {
-    "time_sec": 2.410000024610781e-05
+    "time_sec": 2.6100000468431972e-05
   },
   "summarization_traditional": {
-    "time_sec": 4.330000001573353e-05
+    "time_sec": 4.4100000195612665e-05
   },
   "summarization_ai": {
-    "time_sec": 2.572214199999962
+    "time_sec": 1.5273127999998906
   }
 }

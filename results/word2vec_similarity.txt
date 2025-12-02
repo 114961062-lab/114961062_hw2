@@ -1,0 +1,1 @@
+未安裝 gensim，無法執行 Word2Vec 測試。
