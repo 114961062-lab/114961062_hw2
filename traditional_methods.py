@@ -1,257 +1,293 @@
+# ============================================================
+# traditional_methods.py
+# Part A：傳統方法 — TF-IDF、規則式分類、統計式摘要
+# ============================================================
+
 import math
-import jieba
 import numpy as np
-import pandas as pd
-import re 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def tokenize(text):
-    return [w for w in jieba.lcut(text) if w.strip()]
-
-def split_sentences(text: str):
-    """
-    將一段中文文字依「。！？!?」切成句子
-    回傳句子 list，已去掉空白
-    """
-    if not isinstance(text, str):
-        text = str(text)
-    # 用中文與英文的句號、問號、驚嘆號斷句
-    parts = re.split(r'(?<=[。！？!?])', text)
-    sentences = [p.strip() for p in parts if p.strip()]
-    return sentences
-
-def summarize_text(text: str, max_sentences: int = 2) -> str:
-    """
-    對單一篇文章做抽取式摘要：
-    - 將文章切成句子
-    - 以 TF-IDF 計算每句分數
-    - 取分數最高的 max_sentences 句，依原順序組合
-    """
-    sentences = split_sentences(text)
-
-    # 如果句子數很少，就直接回傳原文
-    if len(sentences) <= max_sentences:
-        return text.strip()
-
-    # 使用前面已經 import 的 TfidfVectorizer 與 tokenize
-    vectorizer = TfidfVectorizer(
-        tokenizer=lambda x: tokenize(x),
-        lowercase=False
-    )
-    X = vectorizer.fit_transform(sentences)  # shape: (num_sentences, vocab_size)
-
-    # 每句分數 = 該行 TF-IDF 權重總和
-    scores = X.sum(axis=1).A1  # 轉成 1D numpy array
-
-    # 取分數最高的 max_sentences 句
-    top_idx = np.argsort(-scores)[:max_sentences]
-    # 為了摘要閱讀順序自然，依原來句子順序排序
-    top_idx_sorted = sorted(top_idx)
-
-    summary_sentences = [sentences[i] for i in top_idx_sorted]
-    summary = "".join(summary_sentences)
-    return summary
+# ============================================================
+# A-1：TF 手動計算
+# ============================================================
 
 def calculate_tf(word_dict, total_words):
-    return {w: count / total_words for w, count in word_dict.items()}
+    """
+    手動計算 TF
+    Args:
+        word_dict: 詞頻字典，例如 {"契": 2, "約": 3}
+        total_words: 文本總詞數
+    Returns:
+        tf_dict: {word: tf}
+    """
+    tf_dict = {}
+    for word, count in word_dict.items():
+        tf_dict[word] = count / total_words if total_words > 0 else 0.0
+    return tf_dict
 
 
 def calculate_idf(documents, word):
+    """
+    手動計算 IDF
+    Args:
+        documents: 文本列表，每一個元素是一段文字
+        word: 目標字詞（此範例以單一字元為 token）
+    Returns:
+        idf_value: IDF 數值
+    """
     N = len(documents)
-    df = sum(1 for doc in documents if word in doc)
-    return math.log(N / (df if df else 1))
+    containing = sum(1 for doc in documents if word in doc)
+    # (N + 1) / (containing + 1) 避免除以 0
+    return math.log((N + 1) / (containing + 1)) + 1
 
 
-def manual_tfidf_vectors(texts):
-    docs = [tokenize(t) for t in texts]
-    vocab = sorted(list(set([w for doc in docs for w in doc])))
+# ============================================================
+# 測試資料：六則具有不同情緒傾向的法律文本
+# （前五則如前，外加一則刻意設計為中性）
+# ============================================================
 
+documents = [
+    # 正面
+    "若買賣契約經雙方善意履行並遵守誠信義務，通常能促成交易順利完成，帶來正面法律效果。",
+    # 負面
+    "行政處分若嚴重違反比例原則，不僅屬違法，更可能造成對人民權利的重大侵害，後果相當負面。",
+    # 負面
+    "行為人因重大過失造成他人損害，依法仍須承擔刑事責任，此情形通常被視為極不當的法律行為。",
+    # 正面
+    "憲法保障人民言論自由，有助於促進民主社會之發展，雖仍需配合法律之必要限制，但整體效果多屬正面。",
+    # 正面
+    "人民在行政訴訟中得依法聲請停止執行，以確保自身權益能受到妥善保護，此制度具積極的保障作用。",
+    # 中性（沒有刻意放入正負面情緒字）
+    "本案中，法院僅就事實與法律適用進行審理，最後作成本於既有判例與學說之判決。"
+]
+
+
+# ============================================================
+# A-1：手動計算 TF-IDF 矩陣與相似度
+# ============================================================
+
+def manual_tfidf(documents):
+    """
+    使用 calculate_tf 與 calculate_idf 手動計算 TF-IDF 矩陣
+    此處為示範，採「字元」為 token（中文未做斷詞）
+    Returns:
+        tfidf_matrix: shape = (num_docs, vocab_size) 的 2D list
+        vocab: 字彙表（list）
+    """
+    # 建立字彙表（簡化版：所有出現過的字元）
+    vocab = sorted(set(ch for doc in documents for ch in doc if ch.strip()))
+    # 每篇文件的詞頻
+    doc_word_counts = []
+    for doc in documents:
+        counts = {}
+        for ch in doc:
+            if not ch.strip():
+                continue
+            counts[ch] = counts.get(ch, 0) + 1
+        doc_word_counts.append(counts)
+
+    # 計算每篇的 TF
     tf_list = []
-    for doc in docs:
-        word_counts = {}
-        for w in doc:
-            word_counts[w] = word_counts.get(w, 0) + 1
-        tf_list.append(calculate_tf(word_counts, len(doc)))
+    for counts in doc_word_counts:
+        total = sum(counts.values())
+        tf_list.append(calculate_tf(counts, total))
 
-    idf_dict = {w: calculate_idf(docs, w) for w in vocab}
+    # 計算每個詞的 IDF
+    idf_dict = {}
+    for word in vocab:
+        idf_dict[word] = calculate_idf(documents, word)
 
-    tfidf = np.zeros((len(texts), len(vocab)))
-    for i, tf in enumerate(tf_list):
-        for j, w in enumerate(vocab):
-            tfidf[i][j] = tf.get(w, 0) * idf_dict[w]
-    return tfidf
+    # 組成 TF-IDF 矩陣
+    tfidf_matrix = []
+    for tf in tf_list:
+        row = []
+        for word in vocab:
+            row.append(tf.get(word, 0.0) * idf_dict[word])
+        tfidf_matrix.append(row)
 
-
-def similarity_manual(texts):
-    vectors = manual_tfidf_vectors(texts)
-    norm = np.linalg.norm(vectors, axis=1, keepdims=True) + 1e-12
-    v = vectors / norm
-    sim = v @ v.T
-    return sim
+    return tfidf_matrix, vocab
 
 
-def similarity_sklearn(texts):
-    vectorizer = TfidfVectorizer(tokenizer=lambda x: tokenize(x), lowercase=False)
-    X = vectorizer.fit_transform(texts)
-    sim = cosine_similarity(X, X)
-    return sim
+# ============================================================
+# A-1：使用 scikit-learn 計算 TF-IDF 與相似度
+# ============================================================
+
+def sklearn_tfidf_similarity(texts):
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(texts)
+    similarity_matrix = cosine_similarity(tfidf_matrix)
+    return tfidf_matrix, similarity_matrix
 
 
-def load_texts_from_csv(path, text_column="text"):
+# ============================================================
+# A-2：規則式文本分類
+# ============================================================
+
+class RuleBasedSentimentClassifier:
     """
-    從 CSV 檔讀取文字欄位
-    1. 如果有名為 text_column 的欄位，就用它
-    2. 如果沒有，就自動改用「第一個欄位」
+    簡易情感分類：
+    - 看到正面詞就加分
+    - 看到負面詞就扣分
+    - 不再做「否定詞反轉」處理，避免中文語境誤判（例如「不僅」）
     """
-    df = pd.read_csv(path)
 
-    # 把整欄都是空的先丟掉，避免亂入
-    df = df.dropna(how="all", axis=1)
+    def __init__(self):
+        # 關鍵詞設計，盡量對應上面 documents 中的用詞
+        self.positive_words = [
+            "善意", "順利", "正面", "有助於", "保障", "妥善", "積極", "發展", "圓滿"
+        ]
+        self.negative_words = [
+            "違法", "侵害", "負面", "嚴重", "重大過失", "損害", "不當", "違反"
+        ]
 
-    # 如果指定的欄位不存在，就用第一個欄位當文字欄
-    if text_column not in df.columns:
-        first_col = df.columns[0]
-        print(f"找不到欄位 '{text_column}'，改用第一個欄位 '{first_col}'。")
-        text_column = first_col
+    def classify(self, text: str) -> str:
+        score = 0
 
-    # 丟掉這個欄位中為 NaN 的列
-    df = df.dropna(subset=[text_column])
+        # 以「關鍵詞是否出現在句中」為準
+        for w in self.positive_words:
+            if w in text:
+                score += 1
 
-    texts = df[text_column].astype(str).tolist()
-    return texts
+        for w in self.negative_words:
+            if w in text:
+                score -= 1
 
-def rule_based_label(text: str) -> str:
+        if score > 0:
+            return "正面"
+        elif score < 0:
+            return "負面"
+        else:
+            return "中性"
+
+
+class TopicClassifier:
     """
-    A-2 規則式分類器
-    這裡先用範例類別，你要依照作業說明，把類別名稱與關鍵字改掉
+    主題分類：
+    依據關鍵詞判斷主要法律領域
     """
-    t = text.lower()
 
-    # ======= 類別 1：AI / 機器學習相關 =======
-    ai_keywords = ["人工智慧", "機器學習", "深度學習", "ai"]
-    if any(k in t for k in ai_keywords):
-        return "AI/ML"
+    def __init__(self):
+        self.topic_keywords = {
+            "民法": ["買賣", "契約", "債務", "誠信義務"],
+            "刑法": ["刑事責任", "重大過失", "犯罪", "不當的法律行為"],
+            "行政法": ["行政處分", "比例原則", "行政機關"],
+            "憲法": ["憲法", "言論自由", "基本權", "民主社會"],
+            "訴訟法": ["行政訴訟", "停止執行", "訴訟", "程序", "法院", "判決"],
+        }
 
-    # ======= 類別 2：運動 / 健康 =======
-    sport_keywords = ["運動", "健康", "跑步", "健身"]
-    if any(k in t for k in sport_keywords):
-        return "Sport/Health"
+    def classify(self, text: str):
+        result = []
+        for topic, keywords in self.topic_keywords.items():
+            if any(k in text for k in keywords):
+                result.append(topic)
 
-    # ======= 其他：無法歸類到上述 =======
-    return "Other"
-
-def run_tfidf_task():
-    csv_path = "data/texts.csv"
-    text_column = "text"
-
-    texts = load_texts_from_csv(csv_path, text_column)
-    print(f"載入 {len(texts)} 筆文本資料")
-
-    sim_manual = similarity_manual(texts)
-    pd.DataFrame(sim_manual).to_csv("results/tfidf_similarity_manual.csv", index=False)
-
-    sim_sklearn = similarity_sklearn(texts)
-    pd.DataFrame(sim_sklearn).to_csv("results/tfidf_similarity_sklearn.csv", index=False)
-
-    print("A-1 完成，已輸出到 results/")
-
-def run_rule_based_A2():
-    """
-    A-2：規則式分類
-    讀取 data/texts.csv，對每筆文本產生一個類別標籤，
-    並輸出到 results/rule_based_A2.csv
-    """
-    csv_path = "data/texts.csv"
-    # 你現在 CSV 第一欄叫 'A-1'，如果之後改成 'text' 要記得一起改
-    text_column = "text"
-
-    texts = load_texts_from_csv(csv_path, text_column)
-    print(f"A-2 載入 {len(texts)} 筆文本資料")
-
-    labels = [rule_based_label(t) for t in texts]
-
-    df_out = pd.DataFrame({
-        "text": texts,
-        "label": labels,
-    })
-
-    output_path = "results/rule_based_A2.csv"
-    df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
-    print(f"A-2 完成，已輸出到 {output_path}")
-
-def run_summary_A3():
-    """
-    A-3：傳統方法的抽取式摘要
-    讀取 data/texts.csv，對每筆文本產生摘要，
-    輸出到 results/summary_A3.csv
-    """
-    csv_path = "data/texts.csv"
-    # 目前你的 CSV 第一欄欄位名稱是 'A-1'，若之後改成 'text' 要同步修改
-    text_column = "A-1"
-
-    texts = load_texts_from_csv(csv_path, text_column)
-    print(f"A-3 載入 {len(texts)} 筆文本資料")
-
-    # 每篇文章取 2 句作摘要；若作業有指定句數，請改 max_sentences
-    summaries = [summarize_text(t, max_sentences=2) for t in texts]
-
-    df_out = pd.DataFrame({
-        "text": texts,
-        "summary": summaries,
-    })
-    output_path = "results/summary_A3.csv"
-    df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
-    print(f"A-3 完成，已輸出到 {output_path}")
-
-def rule_based_label(text):
-    """
-    非機器學習的規則式分類器：
-    依關鍵字判斷此句屬於哪一類
-    你可以依作業要求調整類別與關鍵字
-    """
-    t = text.lower()
-
-    # 類別 1：人工智慧 / 機器學習相關
-    ai_keywords = ["人工智慧", "機器學習", "深度學習", "ai"]
-    if any(k in t for k in ai_keywords):
-        return "AI/ML"
-
-    # 類別 2：運動 / 健康
-    sport_keywords = ["運動", "健康", "習慣"]
-    if any(k in t for k in sport_keywords):
-        return "Sport/Health"
-
-    # 其他
-    return "Other"
-
-def run_rule_based_classification():
-    """
-    A-2：規則式分類
-    讀同一份 CSV，對每一筆文本產生類別標籤，輸出到 results/rule_based_labels.csv
-    """
-    csv_path = "data/texts.csv"
-    text_column = "text"   # 或 "text"，視你實際欄位而定
-
-    texts = load_texts_from_csv(csv_path, text_column)
-    labels = [rule_based_label(t) for t in texts]
-
-    df_out = pd.DataFrame({
-        "text": texts,
-        "label": labels
-    })
-    df_out.to_csv("results/rule_based_labels.csv", index=False, encoding="utf-8-sig")
-    print("A-2 完成，已輸出 results/rule_based_labels.csv")
+        return result if result else ["未分類"]
 
 
+# 測試資料：同上六則文本
+test_texts = documents.copy()
+
+
+# ============================================================
+# A-3：統計式自動摘要
+# ============================================================
+
+class StatisticalSummarizer:
+    def __init__(self):
+        # 簡易停用字，可依需要擴充
+        self.stop_words = set(["的", "了", "在", "是", "並", "其", "於", "可"])
+
+    def sentence_score(self, sentence, word_freq):
+        """
+        計算單一句子的分數：將句中每字的詞頻加總
+        """
+        score = 0
+        for word in sentence:
+            if word in word_freq:
+                score += word_freq[word]
+        return score
+
+    def summarize(self, text, ratio=0.3):
+        """
+        簡易統計式摘要：
+        1. 以「，」切分句子（示範用，可視需要改成更嚴謹切分）
+        2. 建立字元詞頻
+        3. 對每句計算分數
+        4. 取前 ratio 比例的高分句子組成摘要
+        """
+        sentences = [s for s in text.split("，") if s.strip()]
+        words = [ch for ch in text if ch.strip()]
+
+        # 計算詞頻
+        word_freq = {}
+        for w in words:
+            if w not in self.stop_words:
+                word_freq[w] = word_freq.get(w, 0) + 1
+
+        # 計算每句分數
+        scores = []
+        for s in sentences:
+            score = self.sentence_score(s, word_freq)
+            scores.append((s, score))
+
+        # 由高到低排序
+        scores.sort(key=lambda x: x[1], reverse=True)
+
+        # 依比例選句數
+        k = max(1, int(len(sentences) * ratio))
+        top_sentences = [s for s, _ in scores[:k]]
+
+        summary = "，".join(top_sentences)
+        return summary
+
+
+# 測試文章（法律領域）
+article = """
+行政處分若違反比例原則，即可能構成違法，人民得依行政訴訟法提起撤銷訴訟。
+此外，人民亦可聲請停止執行，以避免處分造成難以回復之損害。
+法院審查行政裁量時，將檢驗裁量基礎、目的與適當性，以確保行政行為合乎法治國原則。
+憲法保障人民基本權利，行政機關行使權限不得侵害此等權利。
+"""
+
+
+# ============================================================
+# 主程式：示範所有功能，方便截圖
+# ============================================================
 
 if __name__ == "__main__":
-    # A-1：TF-IDF 相似度
-    run_tfidf_task()
+    # ---- A-1 手動 TF-IDF ----
+    print("=== A-1：手動 TF-IDF Cosine Similarity ===")
+    manual_matrix, vocab = manual_tfidf(documents)
+    manual_matrix_np = np.array(manual_matrix)
+    manual_sim = cosine_similarity(manual_matrix_np)
+    print("字彙表 vocab：", "".join(vocab))
+    print("手動 TF-IDF 相似度矩陣：")
+    print(manual_sim)
 
-    # A-2：規則式分類
-    run_rule_based_A2()
+    # ---- A-1 scikit-learn TF-IDF ----
+    print("\n=== A-1：sklearn TF-IDF Cosine Similarity ===")
+    tfidf_matrix, sklearn_sim = sklearn_tfidf_similarity(documents)
+    print("sklearn 相似度矩陣：")
+    print(sklearn_sim)
 
-    # A-3：抽取式摘要
-    run_summary_A3()
+    # ---- A-2 規則式情感分類 ----
+    print("\n=== A-2：Rule-based Sentiment ===")
+    s = RuleBasedSentimentClassifier()
+    for t in test_texts:
+        print(f"{t} => {s.classify(t)}")
+
+    # ---- A-2 主題分類 ----
+    print("\n=== A-2：Topic Classification ===")
+    tc = TopicClassifier()
+    for t in test_texts:
+        print(f"{t} => {tc.classify(t)}")
+
+    # ---- A-3 統計式摘要 ----
+    print("\n=== A-3：Statistical Summary ===")
+    summ = StatisticalSummarizer()
+    print("原始文章：")
+    print(article.strip())
+    print("\n摘要結果：")
+    print(summ.summarize(article, ratio=0.3))
