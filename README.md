@@ -31,9 +31,9 @@ hw2/
 │   ├── summarization_comparison.txt
 │   └── performance_metrics.json
 │
-└── README.md # 使用說明
+└── README.md # 執行說明
 │
-└── report.md  # 分析報告
+└── report.md  # 分析報告(Markdown格式)
 │
 └── requirements.txt #使用套件版本
 
