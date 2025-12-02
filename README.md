@@ -31,7 +31,11 @@ hw2/
 │   ├── summarization_comparison.txt
 │   └── performance_metrics.json
 │
-└── README.md
+└── README.md # 使用說明
+│
+└── report.md  # 分析報告
+│
+└── requirements.txt #使用套件版本
 
 Part A — Traditional Methods (傳統方法)
 
