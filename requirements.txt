@@ -1,0 +1,23 @@
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+jieba
+stopwordsiso
+openai>=1.0.0
+tqdm
+
+為何這樣配置？
+套件	用途	來源
+numpy	矩陣、向量運算	Part A
+pandas	生成 CSV 需要（比較分析）	Part C
+matplotlib	繪製 TF-IDF 相似度矩陣	Part C
+seaborn	製圖支援（老師要求套件）	Part 0 要求
+scikit-learn	TF-IDF、Cosine Similarity	Part A
+jieba	中文切詞（傳統方法示範）	Part A
+stopwordsiso	中文停用詞	Part A
+openai>=1.0.0	GPT-3.5-turbo 新版 API	Part B
+tqdm	進度條（必要時）	Part 0 老師要求
+🎉 你現在可以直接：
+pip install -r requirements.txt
