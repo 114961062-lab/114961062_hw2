@@ -24,6 +24,7 @@ hw2/
 ├── traditional_methods.py        # Part A：TF-IDF、規則式分類、統計式摘要
 ├── modern_methods.py             # Part B：GPT-3.5-turbo AI 方法（新版 openai SDK）
 ├── comparison.py                 # Part C：自動比較產生四個輸出檔案
+├── comparison_bouns.py           # Part D：加分題
 │
 ├── results/                      # 程式自動生成
 │   ├── tfidf_similarity_matrix.png
